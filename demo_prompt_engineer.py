@@ -19,12 +19,23 @@ project_root = Path(__file__).parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from agent_server.prompt_engineer import (
-    PromptEngineerRequest,
-    run_prompt_engineer,
-    IntentDetector,
-    TaskIntention,
-)
+# Import the improved intent detection
+from core.intent_detector import intent_detector, IntentType
+from core.config_manager import config
+
+# Import existing agent functionality (if available)
+try:
+    from agent_server.prompt_engineer import (
+        PromptEngineerRequest,
+        run_prompt_engineer,
+    )
+
+    PROMPT_ENGINEER_AVAILABLE = True
+except ImportError:
+    PROMPT_ENGINEER_AVAILABLE = False
+    print(
+        "⚠️  Note: prompt_engineer module not found - using standalone intent detection"
+    )
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,24 +50,29 @@ async def demo_intent_detection():
     test_queries = [
         (
             "Erkläre mir die Grundlagen der Quantenphysik",
-            TaskIntention.INFORMATION_RETRIEVAL,
+            IntentType.INFORMATION_SEARCH,
         ),
-        ("Erstelle eine Python-Funktion zur Sortierung", TaskIntention.CODE_GENERATION),
-        ("Analysiere das Sentiment in diesem Text", TaskIntention.TEXT_ANALYSIS),
-        ("Wie kann ich meine Website optimieren?", TaskIntention.PROBLEM_SOLVING),
-        ("Schreibe eine Geschichte über einen Roboter", TaskIntention.CREATIVE_WRITING),
-        ("Übersetze diesen Text ins Englische", TaskIntention.TRANSLATION),
-        ("Fasse diesen Artikel zusammen", TaskIntention.SUMMARIZATION),
-        ("Hallo, wie geht es dir?", TaskIntention.CONVERSATION),
+        ("Erstelle eine Python-Funktion zur Sortierung", IntentType.CODE_GENERATION),
+        ("Analysiere das Sentiment in diesem Text", IntentType.SENTIMENT_ANALYSIS),
+        ("Wie kann ich meine Website optimieren?", IntentType.INFORMATION_SEARCH),
+        ("Schreibe eine Geschichte über einen Roboter", IntentType.CREATIVE_WRITING),
+        ("Übersetze diesen Text ins Englische", IntentType.TRANSLATION),
+        ("Fasse diesen Artikel zusammen", IntentType.SUMMARIZATION),
+        ("Hallo, wie geht es dir?", IntentType.GENERAL_ASSISTANCE),
     ]
 
     for query, expected_intent in test_queries:
-        detected_intent = IntentDetector.detect_intention(query)
+        detected_intent, confidence = intent_detector.detect_intent(query)
         status = "✅" if detected_intent == expected_intent else "❌"
 
         print(f"{status} Query: '{query}'")
         print(f"    Expected: {expected_intent.value}")
-        print(f"    Detected: {detected_intent.value}")
+        print(f"    Detected: {detected_intent.value} (confidence: {confidence:.3f})")
+
+        # Show debug info for failed cases
+        if detected_intent != expected_intent:
+            debug_info = intent_detector.get_intent_confidence_report(query)
+            print(f"    Debug scores: {debug_info}")
         print()
 
 

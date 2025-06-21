@@ -75,31 +75,51 @@ A sophisticated multi-agent system that combines the Model Context Protocol (MCP
 
 ### Installation
 
-1. **Clone the repository**:
+This project uses [uv](https://github.com/astral-sh/uv) for fast and reliable dependency management.
+
+1. **Install uv** (if not already installed):
+   ```bash
+   # On macOS/Linux
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   
+   # On Windows
+   powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+   
+   # Or via pip
+   pip install uv
+   ```
+
+2. **Clone the repository**:
    ```bash
    git clone <repository-url>
-   cd a2a_mcp
+   cd Agent_System
    ```
 
-2. **Install dependencies**:
+3. **Install dependencies with uv**:
    ```bash
-   # Using uv (recommended)
+   # Create virtual environment and install dependencies
    uv sync
    
-   # Or using pip
-   pip install -r requirements.txt
+   # Activate the environment
+   source .venv/bin/activate  # On Unix/macOS
+   # or
+   .venv\Scripts\activate     # On Windows
    ```
 
-3. **Configure environment**:
+4. **Configure environment**:
    ```bash
+   # Copy and edit configuration files
    cp .env.example .env
-   # Edit .env with your settings
+   cp .env.a2ap.example .env.a2ap              # If needed
+   cp .env.mcp.example .env.mcp                # If needed
+   cp .env.prompt_engineer.example .env.prompt_engineer  # If needed
    ```
 
-4. **Start Ollama** (if not running):
+5. **Start Ollama** (if not running):
    ```bash
    ollama serve
    ollama pull qwen2.5:latest
+   ollama pull google/gemma3:latest  # For sentiment analysis
    ```
 
 ### Quick Launch
@@ -167,6 +187,17 @@ print(result.final_result)
 ```
 
 ## 🔧 Configuration
+
+### Modular Configuration System
+
+The system uses a modular configuration approach with separate files for different components:
+
+- **`.env`** - Main system configuration (server, models, debugging)
+- **`.env.a2ap`** - Agent-to-Agent Protocol settings (communication, discovery, delegation)
+- **`.env.mcp`** - Model Context Protocol settings (context management, optimization)
+- **`.env.prompt_engineer`** - Prompt Engineering agent settings (optimization strategies, templates, quality metrics)
+
+The `core/config_manager.py` module provides centralized access to all configuration values with type-safe getters and automatic loading of all configuration files.
 
 ### Environment Variables
 
@@ -263,7 +294,9 @@ Raw Text → Query Refactor → Optimization → Grammar Check → Sentiment Ana
 ### Project Structure
 
 ```
-a2a_mcp/
+Agent_System/
+├── core/                   # Core system components
+│   └── config_manager.py   # Modular configuration manager
 ├── agent_server/           # A2A agents
 │   ├── user_interface.py   # Main coordination agent
 │   ├── optimizer.py        # Text optimization
@@ -276,11 +309,36 @@ a2a_mcp/
 │   ├── mcp_time/         # NTP time services
 │   ├── mcp_anonymizer/   # Data anonymization
 │   └── mcp_fileconverter/ # PDF conversion
+├── .env                   # Main configuration
+├── .env.a2ap             # A2A Protocol configuration
+├── .env.mcp              # Model Context Protocol configuration
+├── .env.prompt_engineer  # Prompt Engineering configuration
 ├── mcp_main.py           # MCP server
 ├── launcher.py           # Service orchestrator
 ├── gradio_interface.py   # Web UI
 ├── a2a_server.py        # A2A registry
+├── pyproject.toml        # uv project configuration
 └── uploaded_files/      # File upload storage
+```
+
+### Development with uv
+
+```bash
+# Install development dependencies
+uv sync --dev
+
+# Add new dependency
+uv add package-name
+
+# Remove dependency
+uv remove package-name
+
+# Update dependencies
+uv lock --upgrade
+
+# Run specific scripts
+uv run python launcher.py
+uv run python mcp_main.py
 ```
 
 ### Adding New Agents
@@ -349,7 +407,23 @@ await lektor_agent("Das ist ein sehr schlechte Satz.")
 
 ## 📄 License
 
-This project is licensed under the AGPL v3 License - see the [License.md](License.md) file for details.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)** - see the [License.md](License.md) file for details.
+
+### AGPLv3 Summary
+
+- ✅ **Commercial use** - You can use this software commercially
+- ✅ **Modification** - You can modify the source code
+- ✅ **Distribution** - You can distribute the software
+- ✅ **Patent use** - Express grant of patent rights from contributors
+- ✅ **Private use** - You can use the software privately
+
+**Requirements:**
+- 📋 **License and copyright notice** - Include the license and copyright notice
+- 📋 **State changes** - Document significant changes made to the software
+- 📋 **Disclose source** - Provide source code when distributing
+- 📋 **Network use is distribution** - **Users interacting with the software over a network must be able to download the source code**
+
+The AGPLv3 ensures that any network service using this code must provide the source code to its users, maintaining the open-source nature even in SaaS deployments.
 
 ## 🙏 Acknowledgments
 

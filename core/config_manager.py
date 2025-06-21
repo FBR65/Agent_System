@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import json
 from dotenv import load_dotenv, dotenv_values
 
@@ -8,10 +8,10 @@ from dotenv import load_dotenv, dotenv_values
 class ConfigManager:
     """
     Centralized configuration manager for modular Agent System.
-    Loads main .env and specialized configuration files (A2AP, MCP).
+    Loads main .env and specialized configuration files (A2AP, MCP, Prompt Engineer).
     """
 
-    def __init__(self, base_path: Optional[str] = None):
+    def __init__(self, base_path: str = None):
         self.base_path = Path(base_path) if base_path else Path.cwd()
         self.config: Dict[str, Any] = {}
         self._load_configurations()
@@ -39,6 +39,16 @@ class ConfigManager:
             mcp_config = dotenv_values(mcp_path)
             self.config.update(mcp_config)
             self._set_env_vars(mcp_config)
+
+        # Load Prompt Engineer configuration
+        pe_config_file = os.getenv(
+            "PROMPT_ENGINEER_CONFIG_FILE", ".env.prompt_engineer"
+        )
+        pe_path = self.base_path / pe_config_file
+        if pe_path.exists():
+            pe_config = dotenv_values(pe_path)
+            self.config.update(pe_config)
+            self._set_env_vars(pe_config)
 
     def _set_env_vars(self, config_dict: Dict[str, str]):
         """Set environment variables from config dictionary"""
@@ -89,6 +99,10 @@ class ConfigManager:
         """Get all MCP related configuration"""
         return {k: v for k, v in self.config.items() if k.startswith("MCP_")}
 
+    def get_prompt_engineer_config(self) -> Dict[str, Any]:
+        """Get all Prompt Engineer related configuration"""
+        return {k: v for k, v in self.config.items() if k.startswith("PE_")}
+
     def get_agent_model(self, agent_type: str) -> str:
         """Get model for specific agent type"""
         model_key = f"{agent_type.upper()}_MODEL"
@@ -101,6 +115,10 @@ class ConfigManager:
     def is_mcp_enabled(self) -> bool:
         """Check if MCP is enabled"""
         return self.get_bool("MCP_ENABLED", True)
+
+    def is_prompt_engineer_enabled(self) -> bool:
+        """Check if Prompt Engineer is enabled"""
+        return self.get_bool("PE_ENABLED", True)
 
     def reload(self):
         """Reload all configurations"""
