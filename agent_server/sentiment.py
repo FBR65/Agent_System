@@ -120,23 +120,20 @@ async def analyze_sentiment_direct(request: SentimentRequest) -> SentimentRespon
                 finally:
                     await mcp_server.close()
             except Exception as e:
-                logging.warning(f"MCP anonymization setup failed: {e}")
-
-        # Simple sentiment analysis simulation
+                logging.warning(f"MCP anonymization setup failed: {e}")        # Enhanced sentiment analysis with German and English words
         text_lower = text_to_analyze.lower()
         positive_words = [
-            "good",
-            "great",
-            "excellent",
-            "amazing",
-            "wonderful",
-            "love",
-            "like",
-            "fantastic",
-            "awesome",
-            "brilliant",
-            "perfect",
-            "outstanding",
+            # English positive words
+            "good", "great", "excellent", "amazing", "wonderful", "love",
+            "like", "fantastic", "awesome", "brilliant", "perfect", "outstanding",
+            "happy", "joy", "excited", "pleased", "satisfied", "delighted",
+            "superb", "marvelous", "fabulous", "terrific", "impressive",
+            # German positive words
+            "gut", "großartig", "ausgezeichnet", "erstaunlich", "wunderbar", 
+            "liebe", "mag", "fantastisch", "toll", "brilliant", "perfekt",
+            "hervorragend", "glücklich", "freude", "aufgeregt", "zufrieden",
+            "erfreut", "begeistert", "super", "klasse", "prima", "spitze",
+            "genial", "sensationell", "phänomenal", "exzellent", "überragend"
         ]
         negative_words = [
             "bad",

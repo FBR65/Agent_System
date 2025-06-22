@@ -17,9 +17,11 @@ project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from core.intent_detector_improved import intent_detector, IntentType
+from core.intent_detector import intent_detector, IntentType
 from core.config_manager import config
 from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -526,11 +528,30 @@ Gewünschter Ton: {request.desired_tone}
 
 
 # Pydantic AI Agent Setup
-prompt_engineer_ai = Agent(
-    model=config.get_agent_model("prompt_engineer"),
-    system_prompt="""Du bist ein fortschrittlicher Prompt Engineering Agent.
-    Deine Aufgabe ist es, Benutzeranfragen zu analysieren und optimale Prompts zu generieren.""",
-)
+def _create_prompt_engineer_ai():
+    """Create the prompt engineer AI agent with proper Ollama configuration."""
+    try:
+        llm_api_key = config.get("API_KEY", "ollama")
+        llm_endpoint = config.get("BASE_URL", "http://localhost:11434/v1")
+        llm_model_name = config.get_agent_model("prompt_engineer")
+
+        provider = OpenAIProvider(base_url=llm_endpoint, api_key=llm_api_key)
+        model = OpenAIModel(provider=provider, model_name=llm_model_name)
+
+        return Agent(
+            model=model,
+            system_prompt="""Du bist ein fortschrittlicher Prompt Engineering Agent.
+            Deine Aufgabe ist es, Benutzeranfragen zu analysieren und optimale Prompts zu generieren."""
+        )
+    except Exception as e:
+        logger.error(f"Failed to initialize prompt engineer AI agent: {e}")
+        return None
+
+try:
+    prompt_engineer_ai = _create_prompt_engineer_ai()
+except Exception:
+    prompt_engineer_ai = None
+    logger.warning("Pydantic AI agent initialization failed - using fallback implementation")
 
 # Globale Instanz
 prompt_engineer = PromptEngineerAgent()

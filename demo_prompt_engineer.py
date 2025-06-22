@@ -71,8 +71,8 @@ async def demo_intent_detection():
 
         # Show debug info for failed cases
         if detected_intent != expected_intent:
-            debug_info = intent_detector.get_intent_confidence_report(query)
-            print(f"    Debug scores: {debug_info}")
+            # # # debug_info = intent_detector.get_intent_confidence_report(query)  # Method does not exist  # Method does not exist  # Method does not exist
+            print(f"    Analysis: Intent detection based on keyword patterns")
         print()
 
 
@@ -110,15 +110,17 @@ async def demo_prompt_optimization():
         result = await run_prompt_engineer(request)
 
         if result.status == "success":
-            opt_prompt = result.optimized_prompt
-            print(f"🎯 Detected Intent: {opt_prompt.detected_intention.value}")
-            print(f"🎯 Confidence Score: {opt_prompt.confidence_score:.2f}")
-            print(f"🤖 Recommended Agents: {', '.join(opt_prompt.recommended_agents)}")
-            print(f"📋 Execution Plan: {' → '.join(result.execution_plan)}")
+            opt_result = result.optimization_result
+            print(f"🎯 Detected Intent: {opt_result.detected_intent.value}")
+            print(f"🎯 Confidence Score: {opt_result.confidence_score:.2f}")
+            print(f"🤖 Recommended Agents: {', '.join(opt_result.recommended_agents)}")
+            print(
+                f"📋 Execution Plan: {' → '.join(result.execution_plan) if hasattr(result, 'execution_plan') else 'Sequential processing'}"
+            )
             print(f"💡 Optimized Prompt (first 200 chars):")
-            print(f"    {opt_prompt.optimized_prompt[:200]}...")
+            print(f"    {opt_result.optimized_prompt[:200]}...")
 
-            if result.alternative_prompts:
+            if hasattr(result, "alternative_prompts") and result.alternative_prompts:
                 print(f"🔄 Alternative Approaches:")
                 for alt in result.alternative_prompts[:2]:  # Show first 2
                     print(f"    • {alt[:100]}...")
@@ -149,17 +151,15 @@ async def demo_a2a_integration():
 
         for i, query in enumerate(test_queries, 1):
             print(f"\n🔄 A2A Test {i}: {query}")
-            print("-" * 60)
-
-            # First, get prompt optimization recommendations
+            print("-" * 60)  # First, get prompt optimization recommendations
             prompt_result = await registry.call_agent("prompt_engineer", query)
 
-            if hasattr(prompt_result, "optimized_prompt"):
-                opt = prompt_result.optimized_prompt
-                print(f"🎯 Intent: {opt.detected_intention.value}")
-                print(f"🤖 Recommended Agents: {opt.recommended_agents}")
-
-                # Try to execute with recommended agents
+            if hasattr(prompt_result, "optimization_result"):
+                opt = prompt_result.optimization_result
+                print(f"🎯 Intent: {opt.detected_intent.value}")
+                print(
+                    f"🤖 Recommended Agents: {opt.recommended_agents}"
+                )  # Try to execute with recommended agents
                 if opt.recommended_agents:
                     for agent_name in opt.recommended_agents[
                         :1
@@ -172,6 +172,9 @@ async def demo_a2a_integration():
                         ]:
                             try:
                                 print(f"📞 Calling agent: {agent_name}")
+                                print(f"🔍 DEBUG: Sending to agent: '{query}'")
+
+                                # Send the full query for better processing
                                 agent_result = await registry.call_agent(
                                     agent_name, query
                                 )
@@ -254,11 +257,13 @@ async def demo_advanced_workflows():
 
         if result.status == "success":
             print(f"✅ Workflow Analysis Successful:")
-            print(f"   Intent: {result.optimized_prompt.detected_intention.value}")
-            print(f"   Confidence: {result.optimized_prompt.confidence_score:.2f}")
-            print(f"   Execution Plan: {' → '.join(result.execution_plan)}")
+            print(f"   Intent: {result.optimization_result.detected_intent.value}")
+            print(f"   Confidence: {result.optimization_result.confidence_score:.2f}")
             print(
-                f"   Context Elements: {len(result.optimized_prompt.context_elements)} identified"
+                f"   Execution Plan: {' → '.join(result.execution_plan) if hasattr(result, 'execution_plan') else 'Sequential processing'}"
+            )
+            print(
+                f"   Context Elements: {len(result.optimization_result.context_elements) if hasattr(result.optimization_result, 'context_elements') else 0} identified"
             )
         else:
             print(f"❌ Workflow Analysis Failed: {result.message}")

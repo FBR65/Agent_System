@@ -348,6 +348,181 @@ mcp.mount()  # This automatically discovers endpoints with operation_id
 
 
 # --- Run Server ---
+
+
+# ========== TOOLS ENDPOINTS HINZUGEFÜGT ==========
+@app.get("/tools")
+async def list_tools():
+    """Liste alle verfügbaren Tools auf"""
+    return {
+        "tools": [
+            {
+                "name": "get_current_time", 
+                "description": "Get current UTC time",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            },
+            {
+                "name": "duckduckgo_search",
+                "description": "Search the web using DuckDuckGo",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search query"},
+                        "max_results": {"type": "integer", "description": "Maximum results", "default": 5}
+                    },
+                    "required": ["query"]
+                }
+            },
+            {
+                "name": "extract_website_text",
+                "description": "Extract text from a website",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "Website URL"}
+                    },
+                    "required": ["url"]
+                }
+            }
+        ]
+    }
+
+@app.get("/mcp/tools")
+async def list_mcp_tools():
+    """MCP-Standard Tools-Listing"""
+    return await list_tools()
+
+@app.post("/mcp/call-tool")
+async def call_mcp_tool(request: dict):
+    """Rufe MCP-Tool auf"""
+    tool_name = request.get("name")
+    arguments = request.get("arguments", {})
+    
+    logger.info(f"🔧 MCP Tool called: {tool_name} with args: {arguments}")
+    
+    if tool_name == "get_current_time":
+        return await get_current_time_tool()
+    elif tool_name == "duckduckgo_search":
+        return await call_search_tool(arguments)
+    elif tool_name == "extract_website_text":
+        return await call_extract_tool(arguments)
+    
+    return {"error": f"Unknown tool: {tool_name}"}
+
+async def get_current_time_tool():
+    """Zeit-Tool Implementation - Verwendet echten NTP Service"""
+    try:
+        import json
+        logger.info("🕐 get_current_time_tool called")
+        
+        # Verwende den echten NTP Service statt Systemzeit
+        if ntp_time is not None:
+            try:
+                # Verwende NTP Zeit
+                current_time = ntp_time.get_formatted_time("%Y-%m-%dT%H:%M:%SZ")
+                source = "ntp_time_service"
+                note = "Zeit vom NTP-Server via MCP"
+            except Exception as ntp_error:
+                logger.error(f"NTP Zeit Fehler: {ntp_error}")
+                # Fallback zu UTC Systemzeit
+                from datetime import datetime, timezone
+                current_utc = datetime.now(timezone.utc)
+                current_time = current_utc.isoformat()
+                source = "system_utc_fallback"
+                note = "System UTC Zeit (NTP nicht verfügbar)"
+        else:
+            # Service nicht verfügbar
+            from datetime import datetime, timezone
+            current_utc = datetime.now(timezone.utc)
+            current_time = current_utc.isoformat()
+            source = "system_utc_only"
+            note = "System UTC Zeit (NTP Service nicht initialisiert)"
+        
+        logger.info(f"✅ Zeit erfolgreich abgerufen: {current_time} (source: {source})")
+        
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps({
+                        "current_time_utc": current_time,
+                        "source": source,
+                        "timezone": "UTC",
+                        "note": note
+                    })
+                }
+            ]
+        }
+    except Exception as e:
+        logger.error(f"❌ Zeit-Tool Fehler: {e}")
+        return {
+            "error": f"Zeit-Tool Fehler: {str(e)}"
+        }
+
+async def call_search_tool(arguments: dict):
+    """DuckDuckGo Search Tool Wrapper"""
+    try:
+        import json
+        query = arguments.get("query", "")
+        max_results = arguments.get("max_results", 5)
+        
+        logger.info(f"🔍 Search tool called: query='{query}', max_results={max_results}")
+        
+        if not duck_searcher:
+            return {"error": "Search service not available"}
+        
+        results = duck_searcher.search(query, num_results=max_results)
+        
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps({
+                        "query": query,
+                        "results": [{"title": r.title, "url": r.url, "snippet": r.snippet} for r in results.results],
+                        "source": "duckduckgo_search"
+                    })
+                }
+            ]
+        }
+    except Exception as e:
+        logger.error(f"❌ Search tool error: {e}")
+        return {"error": f"Search tool error: {str(e)}"}
+
+async def call_extract_tool(arguments: dict):
+    """Website Text Extraction Tool Wrapper"""
+    try:
+        import json
+        url = arguments.get("url", "")
+        
+        logger.info(f"🌐 Extract tool called: url='{url}'")
+        
+        if not headless_browser:
+            return {"error": "Browser service not available"}
+        
+        text = headless_browser.extract_text(url)
+        
+        return {
+            "content": [
+                {
+                    "type": "text",
+                    "text": json.dumps({
+                        "url": url,
+                        "text_content": text,
+                        "source": "headless_browser_extractor"
+                    })
+                }
+            ]
+        }
+    except Exception as e:
+        logger.error(f"❌ Extract tool error: {e}")
+        return {"error": f"Extract tool error: {str(e)}"}
+
+
 if __name__ == "__main__":
     logger.info(f"Starting Uvicorn server on host 0.0.0.0:{port_num}")
 
