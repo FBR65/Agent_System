@@ -377,6 +377,7 @@ registry.register_a2a_agent("my_agent", my_agent_a2a_function)
 # Test individual agents
 python agent_server/sentiment.py
 python agent_server/optimizer.py
+python demo_prompt_engineer.py
 
 # Test MCP server
 curl http://localhost:8000/health
