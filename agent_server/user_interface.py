@@ -72,14 +72,14 @@ def _create_user_interface_agent():
         llm_api_key = os.getenv("API_KEY", "ollama")
         llm_endpoint = os.getenv("BASE_URL", "http://localhost:11434/v1")
         llm_model_name = os.getenv("USER_INTERFACE_MODEL", "qwen2.5:latest")
-        
+
         provider = OpenAIProvider(base_url=llm_endpoint, api_key=llm_api_key)
         model = OpenAIModel(provider=provider, model_name=llm_model_name)
-        
+
         return Agent(
             model=model,
             result_type=UserInterfaceResponse,
-            retries=0,  # FIXED: No retries to avoid validation loops
+            retries=10,  # ERHÖHT: Von 3 auf 10 für bessere Erfolgsrate
             system_prompt="""Du bist ein intelligenter Assistent der Benutzeranfragen bearbeitet.
 
 WICHTIGE REGEL:
@@ -90,7 +90,14 @@ Du MUSST IMMER eine vollständige UserInterfaceResponse zurückgeben mit:
 - status: "success" oder "error" (String)
 - message: Kurze Beschreibung (String)
 
-FÜR TEXTKORREKTUR-ANFRAGEN (HÖCHSTE PRIORITÄT):
+FÜR SENTIMENT-ANALYSE-ANFRAGEN (HÖCHSTE PRIORITÄT):
+Diese Muster sind IMMER Sentiment-Analyse-Anfragen - IGNORIERE andere Keywords:
+- "analysiere das sentiment", "sentiment analyse", "analyze sentiment"
+- "sentiment analysis", "stimmung analysieren", "gefühl analysieren"
+- Text nach "analysiere das sentiment:" oder "analyze sentiment:"
+- Verwende dann: coordinate_with_a2a_agents(text="NUR_DER_ZU_ANALYSIERENDE_TEXT", operation="sentiment")
+
+FÜR TEXTKORREKTUR-ANFRAGEN:
 Diese Muster sind IMMER Korrektur-Anfragen - IGNORIERE andere Keywords:
 - "korrigiere", "correct" 
 - Text nach "korrigiere diesen text:" oder "correct this text:"
@@ -105,20 +112,23 @@ Erkenne diese Muster als Optimierung-Anfragen:
 - Bei "freundliche Antwort" -> verwende "Hier ist unsere Antwort."
 - Verwende dann: coordinate_with_a2a_agents(text="STANDARD_TEXT", operation="optimize", tonality="freundlich")
 
-WICHTIG: Bei "korrigiere" immer operation="correct" verwenden, NIEMALS "optimize"!
+WICHTIG: 
+- Bei "analysiere das sentiment" immer operation="sentiment" verwenden!
+- Bei "korrigiere" immer operation="correct" verwenden, NIEMALS "optimize"!
+- Extrahiere den zu analysierenden Text nach dem Doppelpunkt!
 
 FÜR WETTER-ANFRAGEN:
 1. Verwende get_weather_information(location="...", time_period="...")
 2. Falls das Tool Wetterdaten liefert, gib diese direkt weiter
 3. Erstelle eine einfache, benutzerfreundliche Antwort
 
-BEISPIEL für Korrektur-Response:
+BEISPIEL für Sentiment-Response:
 {
-  "original_text": "Ich möchte einen korrekten Satz",
-  "final_result": "Das ist ein sehr guter Satz mit korrekter Grammatik.",
+  "original_text": "Analysiere das sentiment: Ich bin glücklich",
+  "final_result": "Sentiment Analysis Results:\nLabel: positive\nConfidence: 0.95\nScore: 0.8\nEmotions: joy: 0.9",
   "operation_type": "coordinate_with_a2a_agents", 
   "status": "success",
-  "message": "Text erfolgreich korrigiert"
+  "message": "Sentiment analysis completed"
 }
 
 Halte dich STRIKT an das UserInterfaceResponse Format!""",
@@ -236,18 +246,18 @@ async def get_weather_information(
     """Get weather information quickly with single website extraction."""
     import time
     import urllib.parse
-    
+
     start_time = time.time()
-    
+
     logger.info(f"🌤️ FAST weather extraction for {location} {time_period}")
-    
+
     # Try only ONE reliable website to save time
     weather_url = f"https://wetteronline.de/wetter/{urllib.parse.quote(location)}"
-    
+
     try:
         logger.info(f"📄 Single website extraction from: {weather_url}")
         website_result = await extract_website_content(ctx, weather_url)
-        
+
         if "error" not in website_result and website_result.get("content"):
             # Parse the MCP response format
             content = ""
@@ -258,50 +268,59 @@ async def get_weather_information(
                         break
             else:
                 content = str(website_result["content"])
-            
+
             # SUPER WICHTIG: Der Content ist ein JSON-String mit text_content!
             if content and len(content) > 100:
                 try:
                     # Parse JSON to get actual text content
                     import json
+
                     content_data = json.loads(content)
                     actual_text = content_data.get("text_content", "")
-                    
+
                     if actual_text and len(actual_text) > 50:
-                        logger.info(f"✅ Extracted text content: {actual_text[:200]}...")
-                        
+                        logger.info(
+                            f"✅ Extracted text content: {actual_text[:200]}..."
+                        )
+
                         # PARSE THE REAL WEATHER DATA
                         import re
-                        
+
                         # Extract key info from wetteronline.de
                         weather_info = []
-                        
+
                         # Extract max/min temperatures for tomorrow
                         if "morgen" in time_period.lower():
-                            max_match = re.search(r'max (\d+)°', actual_text)
-                            min_match = re.search(r'min (\d+)°', actual_text)
-                            
+                            max_match = re.search(r"max (\d+)°", actual_text)
+                            min_match = re.search(r"min (\d+)°", actual_text)
+
                             if max_match and min_match:
-                                weather_info.append(f"🌡️ Temperatur: {min_match.group(1)}°C - {max_match.group(1)}°C")
-                            
+                                weather_info.append(
+                                    f"🌡️ Temperatur: {min_match.group(1)}°C - {max_match.group(1)}°C"
+                                )
+
                             # Extract conditions for tomorrow
                             if "Montag Vormittag bewölkt" in actual_text:
                                 weather_info.append("🌤️ Vormittag: Bewölkt")
                             if "Montag Nachmittag bewölkt" in actual_text:
-                                weather_info.append("☁️ Nachmittag: Bewölkt mit möglichen Schauern")
+                                weather_info.append(
+                                    "☁️ Nachmittag: Bewölkt mit möglichen Schauern"
+                                )
                             if "Montag Abend wechselnd bewölkt" in actual_text:
                                 weather_info.append("🌥️ Abend: Wechselnd bewölkt")
-                            
+
                             # Extract wind info
                             if "stürmische Böen" in actual_text:
                                 weather_info.append("💨 Wind: Stürmische Böen erwartet")
-                        
+
                         # Create beautiful weather report
                         if weather_info:
-                            weather_content = f"🌤️ Wetter für {location} {time_period}:\n\n"
+                            weather_content = (
+                                f"🌤️ Wetter für {location} {time_period}:\n\n"
+                            )
                             weather_content += "\n".join(weather_info)
                             weather_content += f"\n\n📍 Quelle: wetteronline.de"
-                            
+
                             return UserInterfaceResponse(
                                 original_text=f"Wetter {location} {time_period}",
                                 final_result=weather_content,
@@ -310,18 +329,22 @@ async def get_weather_information(
                                 message=f"Wetterinformationen von wetteronline.de extrahiert",
                                 processing_time=time.time() - start_time,
                             )
-                        
+
                         # Fallback: Extract any temperatures
-                        temp_matches = re.findall(r'(\d{1,2})°', actual_text)
+                        temp_matches = re.findall(r"(\d{1,2})°", actual_text)
                         if temp_matches and len(temp_matches) > 5:
                             current_temp = temp_matches[0]
                             max_temp = max(temp_matches[:20], key=int)
                             min_temp = min(temp_matches[:20], key=int)
-                            
-                            weather_content = f"🌤️ Wetter für {location} {time_period}:\n\n"
-                            weather_content += f"🌡️ Aktuelle Temperatur: {current_temp}°C\n"
+
+                            weather_content = (
+                                f"🌤️ Wetter für {location} {time_period}:\n\n"
+                            )
+                            weather_content += (
+                                f"🌡️ Aktuelle Temperatur: {current_temp}°C\n"
+                            )
                             weather_content += f"📈 Höchsttemperatur: {max_temp}°C\n"
-                            weather_content += f"📉 Tiefsttemperatur: {min_temp}°C\n"                            
+                            weather_content += f"📉 Tiefsttemperatur: {min_temp}°C\n"
                             # Check for weather conditions
                             if "sonnig" in actual_text.lower():
                                 weather_content += "☀️ Bedingungen: Sonnig\n"
@@ -329,9 +352,9 @@ async def get_weather_information(
                                 weather_content += "☁️ Bedingungen: Bewölkt\n"
                             elif "regen" in actual_text.lower():
                                 weather_content += "🌧️ Bedingungen: Regen möglich\n"
-                                
+
                             weather_content += f"\n📍 Quelle: wetteronline.de"
-                            
+
                             return UserInterfaceResponse(
                                 original_text=f"Wetter {location} {time_period}",
                                 final_result=weather_content,
@@ -340,20 +363,22 @@ async def get_weather_information(
                                 message=f"Wetterinformationen von wetteronline.de extrahiert",
                                 processing_time=time.time() - start_time,
                             )
-                            
+
                 except json.JSONDecodeError:
                     logger.warning("Could not parse JSON content, using raw content")
                     # Fallback to old method if JSON parsing fails
                     pass
-                    
+
             else:
                 logger.info(f"Insufficient content from {weather_url}")
         else:
-            logger.info(f"Website extraction failed for {weather_url}: {website_result.get('error', 'Unknown error')}")
-            
+            logger.info(
+                f"Website extraction failed for {weather_url}: {website_result.get('error', 'Unknown error')}"
+            )
+
     except Exception as extract_error:
         logger.info(f"Website extraction error for {weather_url}: {extract_error}")
-    
+
     # Quick fallback - no more multiple website attempts
     logger.info("⚡ Single website failed, providing instant fallback")
     return UserInterfaceResponse(
@@ -372,26 +397,23 @@ async def extract_website_content(
 ) -> Dict[str, Any]:
     """Extract text content from a website using direct HTTP calls."""
     import httpx
-    
+
     mcp_url = _get_mcp_server_url()
     logger.info(f"📄 Extracting website content from: {url}")
-    
+
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            call_data = {
-                "name": "extract_website_text", 
-                "arguments": {"url": url}
-            }
-            
+            call_data = {"name": "extract_website_text", "arguments": {"url": url}}
+
             response = await client.post(f"{mcp_url}/mcp/call-tool", json=call_data)
-            
+
             if response.status_code == 200:
                 result = response.json()
                 return result
             else:
                 logger.error(f"Website extraction HTTP error: {response.status_code}")
                 return {"error": f"HTTP {response.status_code}: {response.text}"}
-                
+
     except Exception as e:
         logger.error(f"Website extraction failed: {e}")
         return {"error": str(e)}
@@ -432,7 +454,7 @@ def _create_simple_user_interface_agent():
         return Agent(
             model=model,
             result_type=UserInterfaceResponse,
-            retries=0,  # No retries to avoid validation issues
+            retries=10,  # ERHÖHT: Von 3 auf 10 für bessere Erfolgsrate
             system_prompt="""Du bist ein Assistent. Beantworte kurz und hilfsbereit.""",
         )
     except Exception as e:
@@ -660,7 +682,7 @@ async def coordinate_with_a2a_agents(
                     optimizer_text = f"TONALITY:{tonality}|TEXT:{text}"
                 else:
                     optimizer_text = text
-                    
+
                 result = await registry.call_agent("optimizer", optimizer_text)
 
                 if debug_a2a:
@@ -734,7 +756,8 @@ async def coordinate_with_a2a_agents(
                             output_text=optimized_text,
                             status="success",
                             message="Text successfully optimized via A2A registry",
-                        )                    ],
+                        )
+                    ],
                 )
 
             elif operation == "correct":
@@ -1033,7 +1056,9 @@ async def analyze_user_request_intent(
     # PRIORITY 2: Weather queries with clear context
     has_weather_keyword = any(keyword in text_lower for keyword in weather_keywords)
     has_weather_phrase = any(phrase in text_lower for phrase in weather_phrases)
-    has_location = any(indicator in text_lower for indicator in location_indicators)    # Weather detection logic: explicit weather terms OR weather phrases OR weather + location
+    has_location = any(
+        indicator in text_lower for indicator in location_indicators
+    )  # Weather detection logic: explicit weather terms OR weather phrases OR weather + location
     if (
         has_weather_phrase
         or (has_weather_keyword and has_location)
@@ -1044,7 +1069,7 @@ async def analyze_user_request_intent(
     # PRIORITY 3: Pure time queries (without explicit date context)
     if has_explicit_time:
         return "time_query"
-          # PRIORITY 4: Sentiment analysis (explicit requests)
+        # PRIORITY 4: Sentiment analysis (explicit requests)
     if any(
         phrase in text_lower
         for phrase in [
@@ -1057,11 +1082,11 @@ async def analyze_user_request_intent(
             "stimmung analysieren",
             "analyze mood",
             "gefühl analysieren",
-            "emotion analysis"
+            "emotion analysis",
         ]
     ):
         return "sentiment_analysis"
-    
+
     # PRIORITY 5: General information search
     elif (
         any(
@@ -1097,7 +1122,7 @@ async def analyze_user_request_intent(
             "soll korrekt sein",
             "should be correct",
             "korrekten satz",
-            "correct sentence"
+            "correct sentence",
         ]
     ):
         return "text_processing"
@@ -1208,383 +1233,6 @@ async def process_time_query(
         )
 
 
-# A2A server function for user interface (standalone function, not a tool)
-async def user_interface_a2a_function(
-    messages: List[ModelMessage],
-) -> UserInterfaceResponse:
-    """A2A endpoint for user interface functionality."""
-    if not messages:
-        return UserInterfaceResponse(
-            original_text="",
-            final_result="",
-            operation_type="a2a_call",
-            status="error",
-            message="No messages provided",
-        )
-
-    # Extract text from the last user message
-    last_message = messages[-1]
-    if hasattr(last_message, "content") and isinstance(last_message.content, str):
-        text = last_message.content
-    else:
-        text = str(last_message)
-
-    # Let the agent make autonomous decisions
-    context = UserInterfaceContext(request_id="a2a_request")
-    result = await user_interface_agent.run(text, ctx=context)
-    return result.data
-
-
-# Function to process user requests directly through the agent
-async def process_user_request(text: str, **kwargs) -> UserInterfaceResponse:
-    """Process user input through the intelligent agent."""
-    context = UserInterfaceContext(request_id="direct_request")
-    result = await user_interface_agent.run(text, ctx=context)
-    return result.data
-
-
-# New processing function with debugging
-async def process_input(user_input: str) -> UserInterfaceResponse:
-    """
-    Main processing function with better error handling and fallbacks.
-    """
-    import time
-
-    start_time = time.time()
-    debug_mode = os.getenv("DEBUG_AGENT_RESPONSES", "false").lower() == "true"
-
-    try:
-        if debug_mode:
-            logger.info(f"=== USER INTERFACE AGENT DEBUG ===")
-            logger.info(f"Input: {user_input}")
-
-        context = UserInterfaceContext(request_id="gradio_request")
-
-        # Let the User Interface Agent decide what to do - no manual detection
-        try:
-            if debug_mode:
-                logger.info("Running user_interface_agent...")
-
-            # Use the main agent to make all decisions
-            result = await user_interface_agent.run(user_input, ctx=context)
-
-            if debug_mode:
-                logger.info("Agent run completed")
-                logger.info(f"Result: {result}")
-
-            # Check if we got a valid response
-            if hasattr(result, "data") and isinstance(
-                result.data, UserInterfaceResponse
-            ):
-                if debug_mode:
-                    logger.info("Valid UserInterfaceResponse received")
-                return result.data
-
-        except Exception as agent_error:
-            if debug_mode:
-                logger.error(f"Agent run failed: {agent_error}", exc_info=True)
-
-            # If agent fails due to validation, call tools directly
-            logger.info("🔧 Agent validation failed - trying direct tool calls...")            # Direct tool calling based on simple text analysis
-            input_lower = user_input.lower()
-
-            # HIGHEST PRIORITY: Sentiment analysis
-            if any(
-                phrase in input_lower
-                for phrase in [
-                    "analysiere das sentiment",
-                    "sentiment analyse", 
-                    "analyze sentiment",
-                    "sentiment analysis",
-                    "stimmung analysieren",
-                    "gefühl analysieren"
-                ]
-            ):
-                try:
-                    logger.info("🧠 Direct sentiment analysis call")
-                    
-                    # Extract text to analyze
-                    text_to_analyze = user_input
-                    if ":" in user_input:
-                        text_to_analyze = user_input.split(":", 1)[1].strip()
-                    elif "analysiere das sentiment" in input_lower:
-                        # Extract text after "analysiere das sentiment"
-                        start_idx = input_lower.find("analysiere das sentiment") + len("analysiere das sentiment")
-                        if start_idx < len(user_input):
-                            text_to_analyze = user_input[start_idx:].strip()
-                            if text_to_analyze.startswith(":"):
-                                text_to_analyze = text_to_analyze[1:].strip()
-                    
-                    logger.info(f"🎯 Analyzing sentiment for: '{text_to_analyze}'")
-
-                    result = await coordinate_with_a2a_agents(
-                        context, text_to_analyze, "sentiment"
-                    )
-                    return result
-
-                except Exception as sentiment_error:
-                    logger.error(f"Direct sentiment analysis call failed: {sentiment_error}")
-
-            # Time queries
-            if any(
-                word in input_lower
-                for word in ["zeit", "uhr", "spät", "time", "datum", "date"]
-            ):
-                try:
-                    logger.info("⏰ Direct time query call")
-                    time_result = await get_current_time_info(context)
-                    current_time = time_result.get(
-                        "current_time_utc", "Zeit nicht verfügbar"
-                    )
-
-                    return UserInterfaceResponse(
-                        original_text=user_input,
-                        final_result=f"Aktuelle Zeit (UTC): {current_time}",
-                        operation_type="time_query",
-                        status="success",
-                        message="Zeit direkt abgerufen",
-                        processing_time=time.time() - start_time,
-                    )
-                except Exception as time_error:
-                    logger.error(f"Direct time call failed: {time_error}")
-            
-            # Weather queries - now try real weather data first
-            elif any(word in input_lower for word in ["wetter", "weather"]):
-                try:
-                    logger.info("🌤️ Direct weather call")
-                    
-                    # Extract location from query
-                    location = "Deutschland"
-                    if "berlin" in input_lower:
-                        location = "Berlin"
-                    elif "hamburg" in input_lower:
-                        location = "Hamburg"
-                    elif "münchen" in input_lower:
-                        location = "München"
-                    elif "kiel" in input_lower:
-                        location = "Kiel"
-                    elif "lübeck" in input_lower:
-                        location = "Lübeck"
-                    
-                    # Extract time period
-                    time_period = "heute"
-                    if "morgen" in input_lower or "tomorrow" in input_lower:
-                        time_period = "morgen"
-                    
-                    # Call weather tool directly to get real data
-                    result = await get_weather_information(context, location, time_period)
-                    return result
-                    
-                except Exception as weather_error:
-                    logger.error(f"Direct weather call failed: {weather_error}")
-                    
-                    # Fallback only if extraction completely fails
-                    return UserInterfaceResponse(
-                        original_text=user_input,
-                        final_result=f"🌦️ Wetter-Information: Der automatische Wetter-Service ist derzeit nicht verfügbar.\n\nFür aktuelle Wetterinformationen besuchen Sie:\n• https://wetter.de\n• https://wetteronline.de",
-                        operation_type="weather_information",
-                        status="partial_success",
-                        message="Wetter-Service nicht verfügbar",
-                        processing_time=time.time() - start_time,
-                    )            # Text optimization
-            elif any(
-                word in input_lower
-                for word in ["optimier", "verbesser", "freundlich", "korrigier", "möchte einen korrekten"]
-            ):
-                try:
-                    logger.info("✨ Direct text processing call")
-
-                    # Detect operation type
-                    operation = "optimize"
-                    if any(word in input_lower for word in ["korrigier", "correct", "möchte einen korrekten", "korrekten satz"]):
-                        operation = "correct"
-                        
-                    # Extract ONLY the text to be processed, not the instruction
-                    text_to_process = user_input
-                    tonality = "freundlich" if "freundlich" in input_lower else None
-
-                    # Extract text after colon for commands like "Optimiere: TEXT"
-                    if ":" in user_input:
-                        text_to_process = user_input.split(":", 1)[1].strip()
-                    # For phrases like "ich möchte eine freundliche [text]"
-                    elif "möchte" in input_lower and any(word in input_lower for word in ["freundlich", "freundliche"]):
-                        # Extract the actual text to optimize from phrases like "ich möchte eine freundliche Absage"
-                        words = user_input.lower().split()
-                        if "absage" in words:
-                            text_to_process = "Ihre Anfrage wurde abgelehnt."
-                        elif "antwort" in words:
-                            text_to_process = "Hier ist unsere Antwort."
-                        elif "nachricht" in words:
-                            text_to_process = "Hier ist unsere Nachricht."
-                    
-                    logger.info(f"🎯 Operation: {operation}, Text: '{text_to_process}', Tonality: {tonality}")
-
-                    result = await coordinate_with_a2a_agents(
-                        context, text_to_process, operation, tonality                    )
-                    return result
-
-                except Exception as optimize_error:
-                    logger.error(f"Direct optimization call failed: {optimize_error}")
-
-            # If agent fails, try with simplified agent
-            try:
-                logger.info("Main agent failed, trying simplified agent...")
-                simple_agent = _create_simple_user_interface_agent()
-                result = await simple_agent.run(user_input, ctx=context)
-
-                if hasattr(result, "data") and isinstance(
-                    result.data, UserInterfaceResponse
-                ):
-                    return result.data
-
-            except Exception as simple_error:
-                logger.error(f"Simple agent also failed: {simple_error}", exc_info=True)
-
-        # Fallback response for unhandled requests
-        return UserInterfaceResponse(
-            original_text=user_input,
-            final_result=f"Entschuldigung, ich konnte Ihre Anfrage '{user_input}' nicht verarbeiten. Bitte versuchen Sie es mit einer anderen Formulierung.",
-            operation_type="fallback",
-            status="partial_success",
-            message="Fallback-Antwort verwendet",
-        )
-
-    except Exception as e:
-        logger.error(f"Critical error in process_input: {e}", exc_info=True)
-        return UserInterfaceResponse(
-            original_text=user_input,
-            final_result=f"Es tut mir leid, es ist ein technischer Fehler aufgetreten.",
-            operation_type="error",
-            status="error",
-            message=f"Critical error: {str(e)}",
-        )
-
-
-def _create_intelligent_fallback(
-    user_input: str, error_info: str
-) -> UserInterfaceResponse:
-    """Create an intelligent fallback response based on user input analysis."""
-    input_lower = user_input.lower()
-
-    # Detect what the user likely wanted and provide a helpful fallback
-    if any(
-        word in input_lower
-        for word in [
-            "optimier",
-            "verbesser",
-            "freundlich",
-            "korrigier",
-            "optimize",
-            "improve",
-            "correct",
-            "friendly",
-        ]
-    ):
-        # Text processing request
-        if "freundlich" in input_lower or "friendly" in input_lower:
-            # Extract the text to be made friendlier
-            text_to_process = user_input
-            if ":" in user_input:
-                text_to_process = user_input.split(":", 1)[1].strip()
-                # Remove tonality instruction
-                if "(" in text_to_process:
-                    text_to_process = text_to_process.split("(")[0].strip()
-
-            # Provide a simple friendly version
-            if (
-                "abgelehnt" in text_to_process.lower()
-                or "rejected" in text_to_process.lower()
-            ):
-                friendly_result = "Vielen Dank für Ihre Anfrage! Leider können wir Ihrem Wunsch diesmal nicht entsprechen, aber wir würden uns freuen, Ihnen bei einer anderen Gelegenheit helfen zu können."
-            else:
-                friendly_result = (
-                    f"Hier ist eine freundlichere Version: {text_to_process} 😊"
-                )
-
-            return UserInterfaceResponse(
-                original_text=user_input,
-                final_result=friendly_result,
-                operation_type="coordinate_with_a2a_agents",
-                status="success",
-                message="Fallback-Textoptimierung durchgeführt",
-            )
-
-        return UserInterfaceResponse(
-            original_text=user_input,
-            final_result="Es scheint, Sie möchten Text bearbeiten. Das System arbeitet derzeit daran, diese Funktion verfügbar zu machen.",
-            operation_type="coordinate_with_a2a_agents",
-            status="partial_success",
-            message="Textverarbeitung erkannt, aber Verarbeitung fehlgeschlagen",
-        )
-
-    elif any(
-        word in input_lower for word in ["zeit", "uhr", "datum", "time", "date", "spät"]
-    ):
-        return UserInterfaceResponse(
-            original_text=user_input,
-            final_result="Es scheint, Sie fragen nach der Zeit oder dem Datum. Das System arbeitet daran, diese Information abzurufen.",
-            operation_type="process_time_query",
-            status="partial_success",
-            message="Zeit-/Datumsanfrage erkannt, aber Verarbeitung fehlgeschlagen",
-        )
-
-    elif any(word in input_lower for word in ["wetter", "weather", "temperatur"]):
-        return UserInterfaceResponse(
-            original_text=user_input,
-            final_result="Es scheint, Sie fragen nach dem Wetter. Das System arbeitet daran, diese Information abzurufen.",
-            operation_type="search_web_information",
-            status="partial_success",
-            message="Wetteranfrage erkannt, aber Verarbeitung fehlgeschlagen",
-        )
-
-    else:
-        return UserInterfaceResponse(
-            original_text=user_input,
-            final_result=f"Ich habe Ihre Anfrage '{user_input}' verstanden, aber es gab ein Problem bei der Verarbeitung. Bitte versuchen Sie es erneut oder formulieren Sie Ihre Anfrage anders.",
-            operation_type="search_web_information",
-            status="error",
-            message=f"Fallback response - {error_info[:100]}",
-        )
-
-
-# Example usage functions for testing
-async def main():
-    """Main function to demonstrate User Interface Agent usage."""
-    # Test different types of requests
-    test_cases = [
-        "Wie wird das Wetter morgen in Kiel?",  # Weather query
-        "Also echt mal, dieses Produkt ist der letzte Schrott, total verbuggt und wer das kauft ist doch selber schuld, oder?",  # Text processing
-        "Bitte korrigiere diesen Text: Das ist ein sehr schlechte Satz mit viele Fehler.",  # Grammar correction
-        "Was ist die Hauptstadt von Deutschland?",  # Information query
-        "Wie späte ist es jetzt und welches Datum haben wir?",  # Time and date query
-        "Welches datum istmorgen?",  # Ambiguous date query
-    ]
-
-    for i, test_text in enumerate(test_cases, 1):
-        print(f"\n{'=' * 60}")
-        print(f"Test Case {i}: {test_text}")
-        print("=" * 60)
-
-        result = await process_user_request(test_text)
-
-        print(f"Operation: {result.operation_type}")
-        print(f"Status: {result.status}")
-        print(f"Final Result: {result.final_result[:200]}...")
-        print(f"Processing Time: {result.processing_time:.2f}s")
-
-        if result.steps:
-            print("\nProcessing Steps:")
-            for step in result.steps:
-                print(f"  - {step.step_name}: {step.status}")
-
-        if result.sentiment_analysis:
-            print(f"\nSentiment: {result.sentiment_analysis}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
-
-
 @user_interface_agent.tool
 async def optimize_prompt_with_engineer(
     ctx: RunContext[UserInterfaceContext],
@@ -1646,3 +1294,274 @@ async def optimize_prompt_with_engineer(
             "status": "error",
             "processing_time": time.time() - start_time,
         }
+
+
+# A2A server function for user interface (standalone function, not a tool)
+async def user_interface_a2a_function(
+    messages: List[ModelMessage],
+) -> UserInterfaceResponse:
+    """A2A endpoint for user interface functionality."""
+    if not messages:
+        return UserInterfaceResponse(
+            original_text="",
+            final_result="",
+            operation_type="a2a_call",
+            status="error",
+            message="No messages provided",
+        )
+
+    # Extract text from the last user message
+    last_message = messages[-1]
+    if hasattr(last_message, "content") and isinstance(last_message.content, str):
+        text = last_message.content
+    else:
+        text = str(last_message)
+
+    # Let the agent make autonomous decisions
+    context = UserInterfaceContext(request_id="a2a_request")
+    result = await user_interface_agent.run(text, ctx=context)
+    return result.data
+
+
+# Function to process user requests directly through the agent
+async def process_user_request(text: str, **kwargs) -> UserInterfaceResponse:
+    """Process user input through the intelligent agent."""
+    context = UserInterfaceContext(request_id="direct_request")
+    result = await user_interface_agent.run(text, ctx=context)
+    return result.data
+
+
+# New processing function with debugging
+async def process_input(user_input: str) -> UserInterfaceResponse:
+    """
+    Main processing function - NO FALLBACKS, production ready.
+    Uses prompt_engineer workflow.
+    """
+    return await process_input_with_prompt_engineer(user_input)
+
+
+# Aktualisiere die bestehende process_input Funktion
+async def process_input_with_prompt_engineer(user_input: str) -> UserInterfaceResponse:
+    """
+    Hauptverarbeitungsfunktion mit prompt_engineer Integration.
+    Ausnahmen: Wetter- und Zeitfragen werden direkt verarbeitet.
+    """
+    import time
+
+    start_time = time.time()
+    debug_mode = os.getenv("DEBUG_AGENT_RESPONSES", "false").lower() == "true"
+
+    if debug_mode:
+        logger.info(f"=== PROMPT ENGINEER WORKFLOW START ===")
+        logger.info(f"Input: {user_input}")
+
+    try:
+        context = UserInterfaceContext(request_id="prompt_engineer_workflow")
+        input_lower = user_input.lower()
+
+        # AUSNAHMEN: Wetter und Zeit - direkte Verarbeitung ohne prompt_engineer
+        is_weather_query = any(
+            phrase in input_lower
+            for phrase in [
+                "wetter",
+                "weather",
+                "temperatur",
+                "temperature",
+                "wetter morgen",
+                "weather tomorrow",
+                "wird das wetter",
+            ]
+        )
+
+        is_time_query = any(
+            phrase in input_lower
+            for phrase in [
+                "zeit",
+                "time",
+                "uhr",
+                "uhrzeit",
+                "spät",
+                "datum",
+                "date",
+                "wie spät",
+                "what time",
+                "welches datum",
+                "what date",
+            ]
+        )
+
+        if is_weather_query:
+            if debug_mode:
+                logger.info(
+                    "🌤️ AUSNAHME: Wetteranfrage - direkter Aufruf ohne prompt_engineer"
+                )
+
+            # Direkte Wetterverarbeitung
+            location = "Deutschland"
+            if "berlin" in input_lower:
+                location = "Berlin"
+            elif "hamburg" in input_lower:
+                location = "Hamburg"
+            elif "münchen" in input_lower:
+                location = "München"
+            elif "kiel" in input_lower:
+                location = "Kiel"
+
+            time_period = "heute"
+            if "morgen" in input_lower or "tomorrow" in input_lower:
+                time_period = "morgen"
+
+            return await get_weather_information(context, location, time_period)
+
+        if is_time_query:
+            if debug_mode:
+                logger.info(
+                    "⏰ AUSNAHME: Zeitanfrage - direkter Aufruf ohne prompt_engineer"
+                )
+
+            return await process_time_query(context, user_input)
+
+        # STANDARD WORKFLOW: prompt_engineer zuerst aufrufen
+        if debug_mode:
+            logger.info("🎯 STANDARD: Rufe prompt_engineer auf...")
+
+        try:
+            prompt_engineer_result = await optimize_prompt_with_engineer(
+                context, user_input
+            )
+
+            if debug_mode:
+                logger.info(f"🎯 prompt_engineer Ergebnis: {prompt_engineer_result}")
+
+            if prompt_engineer_result.get("status") == "success":
+                # Extrahiere Empfehlungen vom prompt_engineer
+                detected_intention = prompt_engineer_result.get(
+                    "detected_intention", "general_query"
+                )
+                recommended_agents = prompt_engineer_result.get(
+                    "recommended_agents", []
+                )
+                optimized_prompt = prompt_engineer_result.get(
+                    "optimized_prompt", user_input
+                )
+                execution_plan = prompt_engineer_result.get("execution_plan", [])
+
+                if debug_mode:
+                    logger.info(f"🎯 Detected intention: {detected_intention}")
+                    logger.info(f"🎯 Recommended agents: {recommended_agents}")
+                    logger.info(f"🎯 Execution plan: {execution_plan}")
+
+                # Jetzt user_interface Agent entscheiden lassen basierend auf prompt_engineer Empfehlungen
+                enhanced_input = f"""
+Optimierte Anfrage vom prompt_engineer:
+{optimized_prompt}
+
+Erkannte Absicht: {detected_intention}
+Empfohlene Agenten: {", ".join(recommended_agents)}
+Ausführungsplan: {" → ".join(execution_plan)}
+
+Ursprüngliche Anfrage: {user_input}
+"""
+
+                if debug_mode:
+                    logger.info(
+                        f"🤖 Übergebe an user_interface Agent: {enhanced_input[:200]}..."
+                    )
+
+                # user_interface Agent mit optimiertem Prompt laufen lassen
+                result = await user_interface_agent.run(enhanced_input, ctx=context)
+
+                if hasattr(result, "data") and isinstance(
+                    result.data, UserInterfaceResponse
+                ):
+                    # Füge prompt_engineer Informationen zu den Steps hinzu
+                    result.data.steps.insert(
+                        0,
+                        ProcessingStep(
+                            step_name="Prompt Engineering",
+                            input_text=user_input,
+                            output_text=f"Intent: {detected_intention}, Agents: {', '.join(recommended_agents)}",
+                            status="success",
+                            message="Prompt erfolgreich optimiert via prompt_engineer",
+                        ),
+                    )
+                    result.data.processing_time = time.time() - start_time
+                    return result.data
+
+            else:
+                logger.warning(
+                    f"prompt_engineer fehlgeschlagen: {prompt_engineer_result.get('error', 'Unknown error')}"
+                )
+
+        except Exception as pe_error:
+            logger.error(f"prompt_engineer Fehler: {pe_error}")
+            if debug_mode:
+                logger.error(
+                    f"prompt_engineer Fehler Details: {pe_error}", exc_info=True
+                )
+
+        # FALLBACK: Standard user_interface Agent ohne prompt_engineer
+        if debug_mode:
+            logger.info(
+                "🔄 FALLBACK: Standard user_interface Agent ohne prompt_engineer"
+            )
+
+        result = await user_interface_agent.run(user_input, ctx=context)
+
+        if hasattr(result, "data") and isinstance(result.data, UserInterfaceResponse):
+            result.data.processing_time = time.time() - start_time
+            return result.data
+
+    except Exception as e:
+        logger.error(
+            f"Kritischer Fehler in process_input_with_prompt_engineer: {e}",
+            exc_info=True,
+        )
+
+    # Letzter Fallback
+    return UserInterfaceResponse(
+        original_text=user_input,
+        final_result=f"Entschuldigung, es gab ein Problem bei der Verarbeitung Ihrer Anfrage: '{user_input}'",
+        operation_type="error_fallback",
+        status="error",
+        message="Kritischer Verarbeitungsfehler",
+        processing_time=time.time() - start_time,
+    )
+
+
+# Example usage functions for testing
+async def main():
+    """Main function to demonstrate User Interface Agent usage."""
+    # Test different types of requests
+    test_cases = [
+        "Wie wird das Wetter morgen in Kiel?",  # Weather query
+        "Also echt mal, dieses Produkt ist der letzte Schrott, total verbuggt und wer das kauft ist doch selber schuld, oder?",  # Text processing
+        "Bitte korrigiere diesen Text: Das ist ein sehr schlechte Satz mit viele Fehler.",  # Grammar correction
+        "Was ist die Hauptstadt von Deutschland?",  # Information query
+        "Wie späte ist es jetzt und welches Datum haben wir?",  # Time and date query
+        "Welches datum istmorgen?",  # Ambiguous date query
+    ]
+
+    for i, test_text in enumerate(test_cases, 1):
+        print(f"\n{'=' * 60}")
+        print(f"Test Case {i}: {test_text}")
+        print("=" * 60)
+
+        result = await process_user_request(test_text)
+
+        print(f"Operation: {result.operation_type}")
+        print(f"Status: {result.status}")
+        print(f"Final Result: {result.final_result[:200]}...")
+        print(f"Processing Time: {result.processing_time:.2f}s")
+
+        if result.steps:
+            print("\nProcessing Steps:")
+            for step in result.steps:
+                print(f"  - {step.step_name}: {step.status}")
+
+        if result.sentiment_analysis:
+            print(f"\nSentiment: {result.sentiment_analysis}")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

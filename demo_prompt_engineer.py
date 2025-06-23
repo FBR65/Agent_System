@@ -117,13 +117,15 @@ async def demo_prompt_optimization():
             print(
                 f"📋 Execution Plan: {' → '.join(result.execution_plan) if hasattr(result, 'execution_plan') else 'Sequential processing'}"
             )
-            print(f"💡 Optimized Prompt (first 200 chars):")
-            print(f"    {opt_result.optimized_prompt[:200]}...")
+            print(f"💡 Optimized Prompt (VOLLSTÄNDIG):")
+            print(f"    {opt_result.optimized_prompt}")
+            print()
 
             if hasattr(result, "alternative_prompts") and result.alternative_prompts:
-                print(f"🔄 Alternative Approaches:")
-                for alt in result.alternative_prompts[:2]:  # Show first 2
-                    print(f"    • {alt[:100]}...")
+                print(f"🔄 Alternative Approaches (VOLLSTÄNDIG):")
+                for i, alt in enumerate(result.alternative_prompts, 1):
+                    print(f"    {i}. {alt}")
+                print()
         else:
             print(f"❌ Error: {result.message}")
 
@@ -179,21 +181,17 @@ async def demo_a2a_integration():
                                     agent_name, query
                                 )
 
-                                # Extract meaningful result
+                                # Extract meaningful result - VOLLSTÄNDIGE AUSGABE
                                 if hasattr(agent_result, "optimized_text"):
-                                    print(
-                                        f"✅ Result: {agent_result.optimized_text[:100]}..."
-                                    )
+                                    print(f"✅ Result (VOLLSTÄNDIG): {agent_result.optimized_text}")
                                 elif hasattr(agent_result, "corrected_text"):
-                                    print(
-                                        f"✅ Result: {agent_result.corrected_text[:100]}..."
-                                    )
+                                    print(f"✅ Result (VOLLSTÄNDIG): {agent_result.corrected_text}")
                                 elif hasattr(agent_result, "query"):
-                                    print(f"✅ Result: {agent_result.query[:100]}...")
+                                    print(f"✅ Result (VOLLSTÄNDIG): {agent_result.query}")
                                 elif hasattr(agent_result, "sentiment"):
                                     print(f"✅ Result: {agent_result.sentiment}")
                                 else:
-                                    print(f"✅ Result: {str(agent_result)[:100]}...")
+                                    print(f"✅ Result (VOLLSTÄNDIG): {str(agent_result)}")
 
                             except Exception as e:
                                 print(f"❌ Agent call failed: {e}")
@@ -297,5 +295,7 @@ async def main():
         print(f"\n❌ Demo Error: {e}")
 
 
+if __name__ == "__main__":
+    asyncio.run(main())
 if __name__ == "__main__":
     asyncio.run(main())

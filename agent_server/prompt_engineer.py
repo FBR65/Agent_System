@@ -6,7 +6,7 @@ Kombiniert Intent Detection, Prompt Optimization und A2A Agent Routing
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -216,14 +216,139 @@ Stelle strukturierte, akkurate Informationen bereit, die:
             IntentType.GENERAL_ASSISTANCE: ["user_interface"],
         }
 
+    def _detect_intent_and_confidence(self, text: str) -> Tuple[IntentType, float]:
+        """Enhanced intent detection with better pattern matching"""
+        text_lower = text.lower()
+
+        # EXPLICIT SENTIMENT ANALYSIS PATTERNS (HÖCHSTE PRIORITÄT)
+        sentiment_patterns = [
+            "ist dieser text positiv",
+            "ist dieser text negativ",
+            "ist das positiv",
+            "ist das negativ",
+            "sentiment",
+            "stimmung",
+            "gefühl",
+            "emotion",
+            "analyse das gefühl",
+            "wie ist die stimmung",
+            "positive oder negative",
+            "bewerte die stimmung",
+            "sentiment analyse",
+            "sentiment analysis",
+        ]
+
+        # WICHTIG: Prüfe zuerst auf Sentiment-Patterns
+        if any(pattern in text_lower for pattern in sentiment_patterns):
+            logger.info(
+                f"🎯 SENTIMENT PATTERN DETECTED: '{text_lower}' matches sentiment analysis"
+            )
+            return IntentType.SENTIMENT_ANALYSIS, 0.95
+
+        # CODE GENERATION PATTERNS - ERWEITERT
+        code_patterns = [
+            "erstelle eine funktion",
+            "mache eine funktion",
+            "mache eine sortierfunktion",  # HINZUGEFÜGT
+            "sortierfunktion", # HINZUGEFÜGT
+            "programmiere",
+            "code für",
+            "python funktion",
+            "javascript",
+            "algorithmus",
+            "implementiere",
+            "schreibe code",  # HINZUGEFÜGT
+            "entwickle eine",  # HINZUGEFÜGT
+            "erstelle code",  # HINZUGEFÜGT
+            "function",  # HINZUGEFÜGT
+            "method",  # HINZUGEFÜGT
+        ]
+
+        if any(pattern in text_lower for pattern in code_patterns):
+            logger.info(f"🎯 CODE PATTERN DETECTED: '{text_lower}' matches code generation")
+            return IntentType.CODE_GENERATION, 0.85
+
+        # PROBLEM SOLVING / PERFORMANCE PATTERNS - NEU
+        problem_patterns = [
+            "ist langsam",
+            "performance problem",
+            "läuft langsam",
+            "optimierung",
+            "verbessern",
+            "problem mit",
+            "fehler",
+            "bug",
+            "funktioniert nicht",
+            "wie kann ich",
+            "hilfe bei",
+        ]
+
+        if any(pattern in text_lower for pattern in problem_patterns):
+            logger.info(f"🎯 PROBLEM PATTERN DETECTED: '{text_lower}' matches problem solving")
+            return IntentType.INFORMATION_SEARCH, 0.75
+
+        # CREATIVE WRITING PATTERNS
+        creative_patterns = [
+            "schreibe eine geschichte",
+            "erfinde eine geschichte",
+            "creative writing",
+            "gedicht",
+            "erzählung",
+        ]
+
+        if any(pattern in text_lower for pattern in creative_patterns):
+            return IntentType.CREATIVE_WRITING, 0.70
+
+        # TRANSLATION PATTERNS
+        translation_patterns = [
+            "übersetze",
+            "translate",
+            "ins englische",
+            "ins deutsche",
+            "auf englisch",
+        ]
+
+        if any(pattern in text_lower for pattern in translation_patterns):
+            return IntentType.TRANSLATION, 0.80
+
+        # SUMMARIZATION PATTERNS
+        summary_patterns = ["fasse zusammen", "zusammenfassung", "summary", "summarize"]
+
+        if any(pattern in text_lower for pattern in summary_patterns):
+            return IntentType.SUMMARIZATION, 0.80
+
+        # INFORMATION SEARCH PATTERNS - ERWEITERT
+        info_patterns = [
+            "erkläre mir",
+            "was ist",
+            "wie funktioniert",
+            "grundlagen",
+            "definition",
+            "was bedeutet",  # HINZUGEFÜGT
+            "wie geht",  # HINZUGEFÜGT
+            "warum",  # HINZUGEFÜGT
+            "welche",  # HINZUGEFÜGT
+        ]
+
+        if any(pattern in text_lower for pattern in info_patterns):
+            return IntentType.INFORMATION_SEARCH, 0.70
+
+        # DEFAULT: GENERAL ASSISTANCE mit niedriger Confidence
+        logger.info(
+            f"🎯 NO SPECIFIC PATTERN DETECTED for: '{text_lower}' -> general_assistance"
+        )
+        return IntentType.GENERAL_ASSISTANCE, 0.10
+
     async def optimize_prompt(
         self, request: PromptEngineerRequest
     ) -> PromptOptimizationResult:
         """Hauptfunktion für Prompt-Optimierung"""
         start_time = datetime.now()
 
-        # 1. Intent Detection
-        detected_intent, confidence = intent_detector.detect_intent(request.user_input)
+        # 1. Intent Detection - VERWENDE die EIGENE Methode statt intent_detector
+        detected_intent, confidence = self._detect_intent_and_confidence(
+            request.user_input
+        )
         logger.info(
             f"Detected intent: {detected_intent.value} (confidence: {confidence:.3f})"
         )
@@ -527,7 +652,6 @@ Gewünschter Ton: {request.desired_tone}
         return alternatives
 
 
-# Pydantic AI Agent Setup
 def _create_prompt_engineer_ai():
     """Create the prompt engineer AI agent with proper Ollama configuration."""
     try:
@@ -541,17 +665,20 @@ def _create_prompt_engineer_ai():
         return Agent(
             model=model,
             system_prompt="""Du bist ein fortschrittlicher Prompt Engineering Agent.
-            Deine Aufgabe ist es, Benutzeranfragen zu analysieren und optimale Prompts zu generieren."""
+            Deine Aufgabe ist es, Benutzeranfragen zu analysieren und optimale Prompts zu generieren.""",
         )
     except Exception as e:
         logger.error(f"Failed to initialize prompt engineer AI agent: {e}")
         return None
 
+
 try:
     prompt_engineer_ai = _create_prompt_engineer_ai()
 except Exception:
     prompt_engineer_ai = None
-    logger.warning("Pydantic AI agent initialization failed - using fallback implementation")
+    logger.warning(
+        "Pydantic AI agent initialization failed - using fallback implementation"
+    )
 
 # Globale Instanz
 prompt_engineer = PromptEngineerAgent()

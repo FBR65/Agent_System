@@ -146,33 +146,237 @@ async def process_input(
             file_info += f" | 🎭 Tonalität: {tonality}"
 
         if debug_mode:
-            logger.info(f"Processing input: {input_text}")
+            logger.info(f"Processing input with prompt_engineer workflow: {input_text}")
 
-        try:
-            # Import and call the agent
-            from agent_server.user_interface import process_input as agent_process_input
+        # Prüfe auf Wetter- und Zeitfragen (Ausnahmen vom prompt_engineer)
+        weather_keywords = [
+            "wetter",
+            "temperatur",
+            "regen",
+            "schnee",
+            "sonne",
+            "wolken",
+            "gewitter",
+            "wind",
+        ]
+        time_keywords = [
+            "zeit",
+            "uhr",
+            "uhrzeit",
+            "wie spät",
+            "datum",
+            "heute",
+            "morgen",
+        ]
 
-            result = await agent_process_input(input_text)
+        # Füge Textoptimierungs-Keywords hinzu für direkte Verarbeitung
+        text_optimization_keywords = [
+            "korrigiere",
+            "korrektur",
+            "verbessere",
+            "optimiere",
+            "freundlicher",
+            "umschreibe",
+            "tonalität",
+            "ton",
+            "stil",
+            "formuliere",
+            "professionell",
+            "förmlich",
+        ]
 
+        # Sentiment-Analyse Keywords (HÖCHSTE PRIORITÄT)
+        sentiment_keywords = [
+            "analysiere das sentiment",
+            "sentiment analyse",
+            "sentiment analysis",
+            "stimmung analysieren",
+            "gefühl analysieren",
+            "emotion analysis",
+        ]
+
+        input_lower = input_text.lower()
+
+        # PRIORITÄT 1: Sentiment-Analyse (explizite Anfragen)
+        is_sentiment_query = any(phrase in input_lower for phrase in sentiment_keywords)
+
+        # PRIORITÄT 2: Andere Anfragen nur wenn NICHT Sentiment
+        if not is_sentiment_query:
+            is_weather_query = any(
+                keyword in input_lower for keyword in weather_keywords
+            )
+            is_time_query = any(keyword in input_lower for keyword in time_keywords)
+            is_text_optimization = any(
+                keyword in input_lower for keyword in text_optimization_keywords
+            )
+        else:
+            is_weather_query = False
+            is_time_query = False
+            is_text_optimization = False
+
+        if (
+            is_sentiment_query
+            or is_weather_query
+            or is_time_query
+            or is_text_optimization
+        ):
             if debug_mode:
-                logger.info(f"Agent result: {result}")
+                if is_sentiment_query:
+                    query_type = "Sentiment-Analyse"
+                elif is_weather_query:
+                    query_type = "Wetter"
+                elif is_time_query:
+                    query_type = "Zeit"
+                else:
+                    query_type = "Textoptimierung"
 
-        except Exception as agent_error:
-            logger.error(f"Agent error: {agent_error}", exc_info=True)
+                logger.info(
+                    f"🔄 DIREKT: {query_type}-Anfrage erkannt - direkter user_interface Aufruf"
+                )
 
-            # Create a fallback response
-            class FallbackResult:
-                def __init__(self, text):
-                    self.original_text = text
-                    self.final_result = f"Ich habe Ihre Anfrage erhalten: '{text}'. Das System arbeitet daran, Ihnen zu helfen!"
-                    self.operation_type = "fallback"
-                    self.status = "success"
-                    self.message = "Fallback response due to agent error"
-                    self.processing_time = 0.1
-                    self.steps = []
-                    self.sentiment_analysis = None
+            try:
+                # ALLE KRITISCHEN OPERATIONEN: Direkte Tool-Aufrufe ohne problematischen Agent
+                from agent_server.user_interface import (
+                    coordinate_with_a2a_agents,
+                    UserInterfaceContext,
+                )
 
-            result = FallbackResult(input_text)
+                context = UserInterfaceContext(request_id="direct_tool_request")
+
+                # Spezialbehandlung für Sentiment-Analyse
+                if is_sentiment_query:
+                    # Extrahiere den Text nach dem Doppelpunkt
+                    text_to_analyze = input_text
+                    if ":" in input_text:
+                        text_to_analyze = input_text.split(":", 1)[1].strip()
+                    elif "analysiere das sentiment" in input_text.lower():
+                        # Extrahiere Text nach "analysiere das sentiment"
+                        start_idx = input_text.lower().find(
+                            "analysiere das sentiment"
+                        ) + len("analysiere das sentiment")
+                        if start_idx < len(input_text):
+                            text_to_analyze = input_text[start_idx:].strip()
+                            if text_to_analyze.startswith(":"):
+                                text_to_analyze = text_to_analyze[1:].strip()
+
+                    if debug_mode:
+                        logger.info(
+                            f"🧠 Direkter Sentiment-Aufruf für Text: '{text_to_analyze}'"
+                        )
+
+                    # Direkter Aufruf der Sentiment-Analyse
+                    result = await coordinate_with_a2a_agents(
+                        context, text_to_analyze, "sentiment"
+                    )
+
+                # Spezialbehandlung für Textoptimierung
+                elif is_text_optimization:
+                    # Extrahiere den Text und bestimme Operation
+                    text_to_process = input_text
+                    operation = "optimize"
+                    tonality_from_text = None
+
+                    # Bestimme Operation basierend auf Keywords
+                    if any(
+                        word in input_text.lower()
+                        for word in [
+                            "korrigiere",
+                            "correct",
+                            "korrektur",
+                            "correction",
+                        ]
+                    ):
+                        operation = "correct"
+
+                    # Extrahiere Text nach Doppelpunkt
+                    if ":" in input_text:
+                        text_to_process = input_text.split(":", 1)[1].strip()
+                        # Entferne Tonalitäts-Anweisungen aus dem Text
+                        if "(" in text_to_process and text_to_process.endswith(")"):
+                            text_to_process = text_to_process.split("(")[0].strip()
+
+                    # Extrahiere Tonalität aus der ursprünglichen Anfrage
+                    if tonality and tonality != "None":
+                        tonality_from_text = tonality
+
+                    if debug_mode:
+                        logger.info(
+                            f"✨ Direkter {operation}-Aufruf für Text: '{text_to_process}', Tonalität: {tonality_from_text}"
+                        )
+
+                    # Direkter Aufruf der Text-Optimierung/Korrektur
+                    result = await coordinate_with_a2a_agents(
+                        context, text_to_process, operation, tonality_from_text
+                    )
+
+                # Für Wetter und Zeit: Verwende process_user_request nur als letztes Mittel
+                else:
+                    # Fallback auf process_user_request für Wetter/Zeit (weniger kritisch)
+                    from agent_server.user_interface import process_user_request
+
+                    result = await process_user_request(input_text)
+
+                if debug_mode:
+                    logger.info(f"Direkter Tool result: {result}")
+
+            except Exception as direct_error:
+                logger.error(
+                    f"Fehler bei direktem user_interface Aufruf: {direct_error}",
+                    exc_info=True,
+                )
+                # Fehler durchreichen wie gefordert - keine Fallback-Lösung
+                raise direct_error
+        else:
+            # Standard Workflow mit prompt_engineer
+            try:
+                # Import and call the NEW agent function with prompt_engineer integration
+                from agent_server.user_interface import (
+                    process_input_with_prompt_engineer,
+                )
+
+                result = await process_input_with_prompt_engineer(input_text)
+
+                if debug_mode:
+                    logger.info(f"Agent result: {result}")
+
+            except Exception as agent_error:
+                logger.error(
+                    f"Agent error im prompt_engineer workflow: {agent_error}",
+                    exc_info=True,
+                )
+
+                # Bei Fehlern im prompt_engineer Workflow: Fallback auf direkten user_interface
+                if debug_mode:
+                    logger.info(
+                        f"🔄 FALLBACK: Versuche direkten user_interface Aufruf nach prompt_engineer Fehler"
+                    )
+
+                try:
+                    from agent_server.user_interface import process_user_request
+
+                    result = await process_user_request(input_text)
+
+                    if debug_mode:
+                        logger.info(f"Fallback user_interface result: {result}")
+
+                except Exception as fallback_error:
+                    logger.error(
+                        f"Auch Fallback fehlgeschlagen: {fallback_error}", exc_info=True
+                    )
+
+                    # Create a final fallback response
+                    class FallbackResult:
+                        def __init__(self, text):
+                            self.original_text = text
+                            self.final_result = f"Ich habe Ihre Anfrage erhalten: '{text}'. Das System arbeitet daran, Ihnen zu helfen!"
+                            self.operation_type = "final_fallback"
+                            self.status = "success"
+                            self.message = "Fallback response nach System-Fehlern"
+                            self.processing_time = 0.1
+                            self.steps = []
+                            self.sentiment_analysis = None
+
+                    result = FallbackResult(input_text)
 
         # Format the response
         status_emoji = "✅" if result.status == "success" else "❌"
@@ -186,6 +390,21 @@ async def process_input(
             getattr(result, "final_result", "Keine Antwort erhalten"),
         ]
 
+        # Zeige prompt_engineer Informationen an, falls vorhanden
+        if hasattr(result, "steps") and result.steps:
+            prompt_engineer_step = next(
+                (
+                    step
+                    for step in result.steps
+                    if step.step_name == "Prompt Engineering"
+                ),
+                None,
+            )
+            if prompt_engineer_step:
+                response_parts.insert(
+                    4, f"🎯 **Prompt Engineering**: {prompt_engineer_step.output_text}"
+                )
+
         formatted_response = "\n".join(response_parts)
 
         # Create metadata
@@ -195,6 +414,25 @@ async def process_input(
             "status": getattr(result, "status", "unknown"),
             "input_length": len(input_text),
             "debug_mode": debug_mode,
+            "used_prompt_engineer": any(
+                step.step_name == "Prompt Engineering"
+                for step in getattr(result, "steps", [])
+            ),
+            "bypassed_prompt_engineer": is_sentiment_query
+            or is_weather_query
+            or is_time_query
+            or is_text_optimization,
+            "query_type": "sentiment"
+            if is_sentiment_query
+            else (
+                "weather"
+                if is_weather_query
+                else (
+                    "time"
+                    if is_time_query
+                    else ("text_optimization" if is_text_optimization else "standard")
+                )
+            ),
         }
 
         return formatted_response, file_info, json.dumps(metadata, indent=2)
