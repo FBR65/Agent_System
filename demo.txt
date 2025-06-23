@@ -1,0 +1,282 @@
+ PROMPT ENGINEER AGENT - COMPREHENSIVE DEMO
+================================================================================
+Dieses Demo zeigt die erweiterten Fähigkeiten des Prompt Engineer Agents:
+• Intent Detection basierend auf Benutzeranfragen
+• Prompt Optimization mit spezialisierten Templates
+• Agent Routing Empfehlungen
+• Integration mit dem bestehenden A2A System
+• Multi-Step Workflow Orchestrierung
+
+================================================================================
+🧠 INTENT DETECTION DEMO
+================================================================================
+✅ Query: 'Erkläre mir die Grundlagen der Quantenphysik'
+    Expected: information_search
+    Detected: information_search (confidence: 0.700)
+
+✅ Query: 'Erstelle eine Python-Funktion zur Sortierung'
+    Expected: code_generation
+    Detected: code_generation (confidence: 0.800)
+
+✅ Query: 'Analysiere das Sentiment in diesem Text'
+    Expected: sentiment_analysis
+    Detected: sentiment_analysis (confidence: 0.800)
+
+✅ Query: 'Wie kann ich meine Website optimieren?'
+    Expected: information_search
+    Detected: information_search (confidence: 0.700)
+
+✅ Query: 'Schreibe eine Geschichte über einen Roboter'
+    Expected: creative_writing
+    Detected: creative_writing (confidence: 0.700)
+
+✅ Query: 'Übersetze diesen Text ins Englische'
+    Expected: translation
+    Detected: translation (confidence: 0.800)
+
+✅ Query: 'Fasse diesen Artikel zusammen'
+    Expected: summarization
+    Detected: summarization (confidence: 0.800)
+
+✅ Query: 'Hallo, wie geht es dir?'
+    Expected: general_assistance
+    Detected: general_assistance (confidence: 0.100)
+
+
+================================================================================
+🎯 PROMPT OPTIMIZATION DEMO
+================================================================================
+
+📝 Test Case 1: Information Retrieval - Strukturierte Erklärung
+Original Query: 'Erkläre mir maschinelles Lernen'
+------------------------------------------------------------
+INFO:agent_server.prompt_engineer:Detected intent: information_search (confidence: 0.700)
+🎯 Detected Intent: information_search
+🎯 Confidence Score: 0.70
+🤖 Recommended Agents: query_ref
+📋 Execution Plan: Sequential processing
+💡 Optimized Prompt (VOLLSTÄNDIG):
+    Du bist ein Experte für Informationsrecherche und Wissensaufbereitung.
+Aufgabe: Erkläre mir maschinelles Lernen
+Suchkontext: Nicht spezifiziert
+Detailgrad: umfassend
+
+Stelle strukturierte, akkurate Informationen bereit, die:
+- Vollständig und relevant sind
+- Aus vertrauenswürdigen Quellen stammen
+- Logisch organisiert sind
+- Praktisch anwendbar sind
+
+
+
+📝 Test Case 2: Code Generation - Dokumentierter Code
+Original Query: 'Mache eine Sortierfunktion'
+------------------------------------------------------------
+INFO:agent_server.prompt_engineer:🎯 CODE PATTERN DETECTED: 'mache eine sortierfunktion' matches code generation
+INFO:agent_server.prompt_engineer:Detected intent: code_generation (confidence: 0.850)
+🎯 Detected Intent: code_generation
+🎯 Confidence Score: 0.85
+🤖 Recommended Agents: query_ref
+📋 Execution Plan: Sequential processing
+💡 Optimized Prompt (VOLLSTÄNDIG):
+    Du bist ein erfahrener Softwareentwickler und Code-Architekt.
+Aufgabe: Mache eine Sortierfunktion
+Kontext: Nicht spezifiziert
+Technische Anforderungen: Standard Best Practices
+
+Erstelle sauberen, gut dokumentierten Code, der:
+- Best Practices befolgt
+- Vollständig funktionsfähig ist
+- Kommentare und Dokumentation enthält
+- Fehlerbehandlung implementiert
+- Testbar und wartbar ist
+
+
+Beispiel für guten Code:
+```python
+def example_function(param: str) -> str:
+    """Dokumentierte Funktion mit Typ-Hints."""
+    if not param:
+        raise ValueError("Parameter darf nicht leer sein")
+    return param.upper()
+```
+
+
+
+📝 Test Case 3: Text Analysis - Sentiment Bewertung
+Original Query: 'Ist dieser Text positiv: Ich liebe dieses Produkt!'
+------------------------------------------------------------
+INFO:agent_server.prompt_engineer:🎯 SENTIMENT PATTERN DETECTED: 'ist dieser text positiv: ich liebe dieses produkt!' matches sentiment analysis       
+INFO:agent_server.prompt_engineer:Detected intent: sentiment_analysis (confidence: 0.950)
+🎯 Detected Intent: sentiment_analysis
+🎯 Confidence Score: 0.95
+🤖 Recommended Agents: sentiment
+📋 Execution Plan: Sequential processing
+💡 Optimized Prompt (VOLLSTÄNDIG):
+    Du bist ein Experte für Emotionsanalyse und Textverständnis.
+Aufgabe: Ist dieser Text positiv: Ich liebe dieses Produkt!
+Zu analysierender Text: Ist dieser Text positiv: Ich liebe dieses Produkt!
+Analysetiefe: detailliert
+
+Führe eine detaillierte Sentiment-Analyse durch, die:
+- Emotionen präzise identifiziert
+- Stimmungsintensität bewertet
+- Kontextuelle Nuancen erkennt
+- Begründungen für die Bewertung liefert
+
+
+Beispiel-Analyse:
+- Sentiment: Positiv (0.8)
+- Emotionen: Freude, Zufriedenheit
+- Intensität: Hoch
+- Begründung: Verwendung positiver Adjektive
+
+
+
+📝 Test Case 4: Problem Solving - Performance Optimierung
+Original Query: 'Meine App ist langsam'
+------------------------------------------------------------
+INFO:agent_server.prompt_engineer:🎯 PROBLEM PATTERN DETECTED: 'meine app ist langsam' matches problem solving
+INFO:agent_server.prompt_engineer:Detected intent: information_search (confidence: 0.750)
+🎯 Detected Intent: information_search
+🎯 Confidence Score: 0.75
+🤖 Recommended Agents: query_ref
+📋 Execution Plan: Sequential processing
+💡 Optimized Prompt (VOLLSTÄNDIG):
+    Du bist ein Experte für Informationsrecherche und Wissensaufbereitung.
+Aufgabe: Meine App ist langsam
+Suchkontext: Nicht spezifiziert
+Detailgrad: umfassend
+
+Stelle strukturierte, akkurate Informationen bereit, die:
+- Vollständig und relevant sind
+- Aus vertrauenswürdigen Quellen stammen
+- Logisch organisiert sind
+- Praktisch anwendbar sind
+
+
+
+================================================================================
+🔗 A2A INTEGRATION DEMO
+================================================================================
+INFO:a2a_server:🔧 A2A Server Setup starting...
+INFO:a2a_server:🔍 Attempting to import optimizer...
+INFO:a2a_server:✅ Optimizer imported successfully
+INFO:a2a_server:Agent optimizer registered successfully
+INFO:a2a_server:✅ Agent optimizer registered successfully
+INFO:a2a_server:🔍 Attempting to import lektor...
+INFO:a2a_server:✅ Lektor imported successfully
+INFO:a2a_server:Agent lektor registered successfully
+INFO:a2a_server:✅ Agent lektor registered successfully
+INFO:a2a_server:Agent sentiment registered successfully
+INFO:a2a_server:🔍 Attempting to import query_ref...
+INFO:a2a_server:✅ Query_ref imported successfully
+INFO:a2a_server:Agent query_ref registered successfully
+INFO:a2a_server:✅ Agent query_ref registered successfully
+INFO:a2a_server:Agent prompt_engineer registered successfully
+INFO:a2a_server:🎯 A2A Registry Setup Complete. Registered agents: ['optimizer', 'lektor', 'sentiment', 'query_ref', 'prompt_engineer']
+
+🔄 A2A Test 1: Optimiere diesen Text für eine professionelle E-Mail: Das ist Schrott!
+------------------------------------------------------------
+INFO:a2a_server:A2A Registry: Calling prompt_engineer
+INFO:a2a_server:A2A Registry: Input data type: <class 'str'>
+INFO:a2a_server:A2A Registry: Input data: 'Optimiere diesen Text für eine professionelle E-Mail: Das ist Schrott!'
+INFO:a2a_server:A2A Registry: Created 1 proper UserMessage(s)
+INFO:a2a_server:A2A Registry: Message 0: 'Optimiere diesen Text für eine professionelle E-Mail: Das ist Schrott!' (type: <class 'a2a_server.FixedA2ARegistry.call_agent.<locals>.UserMessage'>)
+INFO:a2a_server:🎯 PROMPT ENGINEER: Extracted text: 'Optimiere diesen Text für eine professionelle E-Mail: Das ist Schrott!'
+INFO:agent_server.prompt_engineer:🎯 NO SPECIFIC PATTERN DETECTED for: 'optimiere diesen text für eine professionelle e-mail: das ist schrott!' -> general_assistance
+INFO:agent_server.prompt_engineer:Detected intent: general_assistance (confidence: 0.100)
+🎯 Intent: general_assistance
+🤖 Recommended Agents: ['user_interface', 'lektor']
+
+🔄 A2A Test 2: Korrigiere die Grammatik: Das ist ein sehr schlechte Satz.
+------------------------------------------------------------
+INFO:a2a_server:A2A Registry: Calling prompt_engineer
+INFO:a2a_server:A2A Registry: Input data type: <class 'str'>
+INFO:a2a_server:A2A Registry: Input data: 'Korrigiere die Grammatik: Das ist ein sehr schlechte Satz.'
+INFO:a2a_server:A2A Registry: Created 1 proper UserMessage(s)
+INFO:a2a_server:A2A Registry: Message 0: 'Korrigiere die Grammatik: Das ist ein sehr schlechte Satz.' (type: <class 'a2a_server.FixedA2ARegistry.call_agent.<locals>.UserMessage'>)
+INFO:a2a_server:🎯 PROMPT ENGINEER: Extracted text: 'Korrigiere die Grammatik: Das ist ein sehr schlechte Satz.'
+INFO:agent_server.prompt_engineer:🎯 NO SPECIFIC PATTERN DETECTED for: 'korrigiere die grammatik: das ist ein sehr schlechte satz.' -> general_assistance
+INFO:agent_server.prompt_engineer:Detected intent: general_assistance (confidence: 0.100)
+🎯 Intent: general_assistance
+🤖 Recommended Agents: ['user_interface', 'lektor']
+
+🔄 A2A Test 3: Analysiere das Sentiment: Ich bin super glücklich heute!
+------------------------------------------------------------
+INFO:a2a_server:A2A Registry: Calling prompt_engineer
+INFO:a2a_server:A2A Registry: Input data type: <class 'str'>
+INFO:a2a_server:A2A Registry: Input data: 'Analysiere das Sentiment: Ich bin super glücklich heute!'
+INFO:a2a_server:A2A Registry: Created 1 proper UserMessage(s)
+INFO:a2a_server:A2A Registry: Message 0: 'Analysiere das Sentiment: Ich bin super glücklich heute!' (type: <class 'a2a_server.FixedA2ARegistry.call_agent.<locals>.UserMessage'>)
+INFO:a2a_server:🎯 PROMPT ENGINEER: Extracted text: 'Analysiere das Sentiment: Ich bin super glücklich heute!'
+INFO:agent_server.prompt_engineer:🎯 SENTIMENT PATTERN DETECTED: 'analysiere das sentiment: ich bin super glücklich heute!' matches sentiment analysis 
+INFO:agent_server.prompt_engineer:Detected intent: sentiment_analysis (confidence: 0.950)
+🎯 Intent: sentiment_analysis
+🤖 Recommended Agents: ['sentiment']
+📞 Calling agent: sentiment
+🔍 DEBUG: Sending to agent: 'Analysiere das Sentiment: Ich bin super glücklich heute!'
+INFO:a2a_server:A2A Registry: Calling sentiment
+INFO:a2a_server:A2A Registry: Input data type: <class 'str'>
+INFO:a2a_server:A2A Registry: Input data: 'Analysiere das Sentiment: Ich bin super glücklich heute!'
+INFO:a2a_server:A2A Registry: Created 1 proper UserMessage(s)
+INFO:a2a_server:A2A Registry: Message 0: 'Analysiere das Sentiment: Ich bin super glücklich heute!' (type: <class 'a2a_server.FixedA2ARegistry.call_agent.<locals>.UserMessage'>)
+✅ Result: label='positive' confidence=0.8799999999999999 score=0.7
+
+🔄 A2A Test 4: Verbessere diese Anfrage für ein LLM: Erkläre KI
+------------------------------------------------------------
+INFO:a2a_server:A2A Registry: Calling prompt_engineer
+INFO:a2a_server:A2A Registry: Input data type: <class 'str'>
+INFO:a2a_server:A2A Registry: Input data: 'Verbessere diese Anfrage für ein LLM: Erkläre KI'
+INFO:a2a_server:A2A Registry: Created 1 proper UserMessage(s)
+INFO:a2a_server:A2A Registry: Message 0: 'Verbessere diese Anfrage für ein LLM: Erkläre KI' (type: <class 'a2a_server.FixedA2ARegistry.call_agent.<locals>.UserMessage'>)
+INFO:a2a_server:🎯 PROMPT ENGINEER: Extracted text: 'Verbessere diese Anfrage für ein LLM: Erkläre KI'
+INFO:agent_server.prompt_engineer:🎯 NO SPECIFIC PATTERN DETECTED for: 'verbessere diese anfrage für ein llm: erkläre ki' -> general_assistance        
+INFO:agent_server.prompt_engineer:Detected intent: general_assistance (confidence: 0.100)
+🎯 Intent: general_assistance
+🤖 Recommended Agents: ['user_interface', 'lektor']
+INFO:a2a_server:A2A Registry stopped
+
+================================================================================
+⚡ ADVANCED WORKFLOW DEMO
+================================================================================
+
+🎭 Scenario: Multi-Step Text Processing
+Query: 'Dieser Text ist schlecht geschrieben und soll professionell werden: Das Produkt ist echt der letzte Schrott!'
+Planned Steps: Intent Detection → Agent Routing → Text Optimization → Grammar Check
+------------------------------------------------------------
+INFO:agent_server.prompt_engineer:🎯 NO SPECIFIC PATTERN DETECTED for: 'dieser text ist schlecht geschrieben und soll professionell werden: das produkt ist echt der letzte schrott!' -> general_assistance
+INFO:agent_server.prompt_engineer:Detected intent: general_assistance (confidence: 0.100)
+✅ Workflow Analysis Successful:
+   Intent: general_assistance
+   Confidence: 0.10
+   Execution Plan: Sequential processing
+   Context Elements: 1 identified
+
+🎭 Scenario: Code Generation with Optimization
+Query: 'Erstelle mir eine REST API für Benutzerregistrierung mit Validierung'
+Planned Steps: Intent Detection → Code Template Selection → Implementation → Documentation
+------------------------------------------------------------
+INFO:agent_server.prompt_engineer:🎯 NO SPECIFIC PATTERN DETECTED for: 'erstelle mir eine rest api für benutzerregistrierung mit validierung' -> general_assistance
+INFO:agent_server.prompt_engineer:Detected intent: general_assistance (confidence: 0.100)
+✅ Workflow Analysis Successful:
+   Intent: general_assistance
+   Confidence: 0.10
+   Execution Plan: Sequential processing
+   Context Elements: 1 identified
+
+🎭 Scenario: Research Query Enhancement
+Query: 'Was ist KI?'
+Planned Steps: Query Analysis → Optimization → Information Structuring → Response Generation
+------------------------------------------------------------
+INFO:agent_server.prompt_engineer:Detected intent: information_search (confidence: 0.700)
+✅ Workflow Analysis Successful:
+   Intent: information_search
+   Confidence: 0.70
+   Execution Plan: Sequential processing
+   Context Elements: 0 identified
+
+================================================================================
+✅ DEMO COMPLETE!
+Der Prompt Engineer Agent ist bereit für den produktiven Einsatz.
+================================================================================
